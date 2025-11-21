@@ -565,7 +565,8 @@ export class OpenAIContentGenerator implements ContentGenerator {
     // Combine all text content from the stream
     const combinedParts: Part[] = [];
     let combinedText = '';
-    const functionCalls: Part[] = [];
+    const functionCallParts: Part[] = [];
+    const functionCallsList: FunctionCall[] = [];
 
     for (const response of responses) {
       if (response.candidates?.[0]?.content?.parts) {
@@ -573,7 +574,8 @@ export class OpenAIContentGenerator implements ContentGenerator {
           if ('text' in part && part.text) {
             combinedText += part.text;
           } else if ('functionCall' in part && part.functionCall) {
-            functionCalls.push(part);
+            functionCallParts.push(part);
+            functionCallsList.push(part.functionCall);
           }
         }
       }
@@ -585,7 +587,7 @@ export class OpenAIContentGenerator implements ContentGenerator {
     }
 
     // Add function calls
-    combinedParts.push(...functionCalls);
+    combinedParts.push(...functionCallParts);
 
     // Create combined response
     const combinedResponse = new GenerateContentResponse();
@@ -605,6 +607,11 @@ export class OpenAIContentGenerator implements ContentGenerator {
     combinedResponse.modelVersion = this.model;
     combinedResponse.promptFeedback = { safetyRatings: [] };
     combinedResponse.usageMetadata = finalUsageMetadata;
+
+    // Populate the top-level functionCalls property
+    if (functionCallsList.length > 0) {
+      combinedResponse.functionCalls = functionCallsList;
+    }
 
     return combinedResponse;
   }
@@ -1134,6 +1141,7 @@ export class OpenAIContentGenerator implements ContentGenerator {
     const response = new GenerateContentResponse();
 
     const parts: Part[] = [];
+    const functionCalls: FunctionCall[] = [];
 
     // Handle text content
     if (choice.message.content) {
@@ -1158,13 +1166,16 @@ export class OpenAIContentGenerator implements ContentGenerator {
             }
           }
 
+          const functionCall: FunctionCall = {
+            id: toolCall.id,
+            name: toolCall.function.name,
+            args,
+          };
+
           parts.push({
-            functionCall: {
-              id: toolCall.id,
-              name: toolCall.function.name,
-              args,
-            },
+            functionCall,
           });
+          functionCalls.push(functionCall);
         }
       }
     }
@@ -1183,6 +1194,11 @@ export class OpenAIContentGenerator implements ContentGenerator {
 
     response.modelVersion = this.model;
     response.promptFeedback = { safetyRatings: [] };
+
+    // Populate the top-level functionCalls property for tool execution
+    if (functionCalls.length > 0) {
+      response.functionCalls = functionCalls;
+    }
 
     // Add usage metadata if available
     if (openaiResponse.usage) {
@@ -1225,6 +1241,7 @@ export class OpenAIContentGenerator implements ContentGenerator {
 
     if (choice) {
       const parts: Part[] = [];
+      const functionCalls: FunctionCall[] = [];
 
       // Handle text content
       if (choice.delta?.content) {
@@ -1276,13 +1293,16 @@ export class OpenAIContentGenerator implements ContentGenerator {
               }
             }
 
+            const functionCall: FunctionCall = {
+              id: accumulatedCall.id,
+              name: accumulatedCall.name,
+              args,
+            };
+
             parts.push({
-              functionCall: {
-                id: accumulatedCall.id,
-                name: accumulatedCall.name,
-                args,
-              },
+              functionCall,
             });
+            functionCalls.push(functionCall);
           }
         }
         // Clear all accumulated tool calls
@@ -1302,6 +1322,11 @@ export class OpenAIContentGenerator implements ContentGenerator {
           safetyRatings: [],
         },
       ];
+
+      // Populate the top-level functionCalls property for tool execution
+      if (functionCalls.length > 0) {
+        response.functionCalls = functionCalls;
+      }
     } else {
       response.candidates = [];
     }
