@@ -125,7 +125,7 @@ const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
  * isExplicitFilePath('OLLAMA.md') // true - explicit file name
  * isExplicitFilePath('src/file.ts') // true - explicit file path
  * isExplicitFilePath('*.md') // false - contains wildcard
- * isExplicitFilePath('src/**\/file.ts') // false - contains wildcard
+ * isExplicitFilePath('src/ ** /file.ts') // false - contains wildcard (note: spaces added for doc)
  * isExplicitFilePath('file?.txt') // false - contains wildcard
  */
 function isExplicitFilePath(pattern: string): boolean {
