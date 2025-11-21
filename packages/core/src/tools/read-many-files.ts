@@ -299,18 +299,24 @@ Use this tool when the user's query implies needing the content of several files
     // Remove exclusion patterns that would prevent explicitly requested files
     // from being found
     if (explicitFilePaths.length > 0) {
+      // Normalize explicit file paths once, outside the filter loop
+      const normalizedExplicitPaths = explicitFilePaths.map((p) =>
+        p.replace(/\\/g, '/'),
+      );
+
       effectiveExcludes = effectiveExcludes.filter((excludePattern) => {
+        const normalizedExclude = excludePattern.replace(/\\/g, '/');
+
         // Check if this exclusion pattern would match any explicit file
-        for (const explicitPath of explicitFilePaths) {
-          // Normalize paths for comparison
-          const normalizedPath = explicitPath.replace(/\\/g, '/');
-          const normalizedExclude = excludePattern.replace(/\\/g, '/');
-          
+        for (const normalizedPath of normalizedExplicitPaths) {
           // Check if the exclude pattern would match the explicit file
           // Pattern like **/OLLAMA.md should match OLLAMA.md or any/path/OLLAMA.md
           if (normalizedExclude.startsWith('**/')) {
             const fileName = normalizedExclude.substring(3);
-            if (normalizedPath === fileName || normalizedPath.endsWith('/' + fileName)) {
+            if (
+              normalizedPath === fileName ||
+              normalizedPath.endsWith('/' + fileName)
+            ) {
               return false; // Don't include this exclusion
             }
           } else if (normalizedExclude === normalizedPath) {
