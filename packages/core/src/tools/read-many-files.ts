@@ -117,6 +117,16 @@ const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
 /**
  * Checks if a pattern is an explicit file path (no glob wildcards).
  * Explicit patterns should not be excluded by default exclusions.
+ * 
+ * @param pattern - The file path or glob pattern to check
+ * @returns true if the pattern contains no glob wildcards, false otherwise
+ * 
+ * @example
+ * isExplicitFilePath('OLLAMA.md') // true - explicit file name
+ * isExplicitFilePath('src/file.ts') // true - explicit file path
+ * isExplicitFilePath('*.md') // false - contains wildcard
+ * isExplicitFilePath('src/**\/file.ts') // false - contains wildcard
+ * isExplicitFilePath('file?.txt') // false - contains wildcard
  */
 function isExplicitFilePath(pattern: string): boolean {
   // Check for glob wildcards: *, **, ?, [, ], {, }
@@ -309,8 +319,12 @@ Use this tool when the user's query implies needing the content of several files
 
         // Check if this exclusion pattern would match any explicit file
         for (const normalizedPath of normalizedExplicitPaths) {
-          // Check if the exclude pattern would match the explicit file
-          // Pattern like **/OLLAMA.md should match OLLAMA.md or any/path/OLLAMA.md
+          // Handle common exclusion pattern formats:
+          // 1. **/filename - matches filename at any depth (e.g., **/OLLAMA.md)
+          // 2. exact path - matches the exact path
+          // Note: This is intentionally simple and covers the patterns in DEFAULT_EXCLUDES.
+          // More complex glob patterns are not needed here as we're only checking
+          // explicit file paths (no wildcards) against exclusion patterns.
           if (normalizedExclude.startsWith('**/')) {
             const fileName = normalizedExclude.substring(3);
             if (
