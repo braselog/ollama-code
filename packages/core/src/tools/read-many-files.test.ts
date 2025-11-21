@@ -421,5 +421,52 @@ describe('ReadManyFilesTool', () => {
       expect(result.returnDisplay).not.toContain('foo.quux');
       expect(result.returnDisplay).toContain('bar.ts');
     });
+
+    it('should read OLLAMA.md when explicitly requested (not excluded by default)', async () => {
+      createFile('OLLAMA.md', '# OLLAMA Context\nSome context');
+      createFile('README.md', '# README');
+      const params = { paths: ['OLLAMA.md'] };
+      const result = await tool.execute(params, new AbortController().signal);
+      const content = result.llmContent as string[];
+      const expectedPath = path.join(tempRootDir, 'OLLAMA.md');
+      expect(
+        content.some((c) =>
+          c.includes(`--- ${expectedPath} ---\n\n# OLLAMA Context\nSome context\n\n`),
+        ),
+      ).toBe(true);
+      expect(result.returnDisplay).toContain(
+        'Successfully read and concatenated content from **1 file(s)**',
+      );
+      expect(result.returnDisplay).toContain('OLLAMA.md');
+    });
+
+    it('should exclude OLLAMA.md from wildcard patterns but allow explicit request', async () => {
+      createFile('OLLAMA.md', '# OLLAMA Context');
+      createFile('README.md', '# README');
+      createFile('GUIDE.md', '# GUIDE');
+
+      // Wildcard should exclude OLLAMA.md
+      const wildcardParams = { paths: ['*.md'] };
+      const wildcardResult = await tool.execute(
+        wildcardParams,
+        new AbortController().signal,
+      );
+      const wildcardContent = wildcardResult.llmContent as string[];
+      const wildcardStr = wildcardContent.join('\n');
+      expect(wildcardStr).not.toContain('OLLAMA Context');
+      expect(wildcardStr).toContain('README');
+      expect(wildcardStr).toContain('GUIDE');
+
+      // Explicit request should include OLLAMA.md
+      const explicitParams = { paths: ['OLLAMA.md', 'README.md'] };
+      const explicitResult = await tool.execute(
+        explicitParams,
+        new AbortController().signal,
+      );
+      const explicitContent = explicitResult.llmContent as string[];
+      const explicitStr = explicitContent.join('\n');
+      expect(explicitStr).toContain('OLLAMA Context');
+      expect(explicitStr).toContain('README');
+    });
   });
 });

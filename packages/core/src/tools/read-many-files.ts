@@ -115,6 +115,15 @@ const DEFAULT_EXCLUDES: string[] = [
 const DEFAULT_OUTPUT_SEPARATOR_FORMAT = '--- {filePath} ---';
 
 /**
+ * Checks if a pattern is an explicit file path (no glob wildcards).
+ * Explicit patterns should not be excluded by default exclusions.
+ */
+function isExplicitFilePath(pattern: string): boolean {
+  // Check for glob wildcards: *, **, ?, [, ], {, }
+  return !/[*?[\]{}]/.test(pattern);
+}
+
+/**
  * Tool implementation for finding and reading multiple text files from the local filesystem
  * within a specified target directory. The content is concatenated.
  * It is intended to run in an environment with access to the local file system (e.g., a Node.js backend).
@@ -270,16 +279,46 @@ Use this tool when the user's query implies needing the content of several files
     const processedFilesRelativePaths: string[] = [];
     const contentParts: PartListUnion = [];
 
-    const effectiveExcludes = useDefaultExcludes
-      ? [...DEFAULT_EXCLUDES, ...exclude, ...this.geminiIgnorePatterns]
-      : [...exclude, ...this.geminiIgnorePatterns];
-
     const searchPatterns = [...inputPatterns, ...include];
     if (searchPatterns.length === 0) {
       return {
         llmContent: 'No search paths or include patterns provided.',
         returnDisplay: `## Information\n\nNo search paths or include patterns were specified. Nothing to read or concatenate.`,
       };
+    }
+
+    // Determine which patterns are explicit file paths (no wildcards)
+    const explicitFilePaths = searchPatterns.filter(isExplicitFilePath);
+
+    // Build effective exclusion list, but exclude patterns that would match
+    // explicitly requested files
+    let effectiveExcludes = useDefaultExcludes
+      ? [...DEFAULT_EXCLUDES, ...exclude, ...this.geminiIgnorePatterns]
+      : [...exclude, ...this.geminiIgnorePatterns];
+
+    // Remove exclusion patterns that would prevent explicitly requested files
+    // from being found
+    if (explicitFilePaths.length > 0) {
+      effectiveExcludes = effectiveExcludes.filter((excludePattern) => {
+        // Check if this exclusion pattern would match any explicit file
+        for (const explicitPath of explicitFilePaths) {
+          // Normalize paths for comparison
+          const normalizedPath = explicitPath.replace(/\\/g, '/');
+          const normalizedExclude = excludePattern.replace(/\\/g, '/');
+          
+          // Check if the exclude pattern would match the explicit file
+          // Pattern like **/OLLAMA.md should match OLLAMA.md or any/path/OLLAMA.md
+          if (normalizedExclude.startsWith('**/')) {
+            const fileName = normalizedExclude.substring(3);
+            if (normalizedPath === fileName || normalizedPath.endsWith('/' + fileName)) {
+              return false; // Don't include this exclusion
+            }
+          } else if (normalizedExclude === normalizedPath) {
+            return false; // Don't include this exclusion
+          }
+        }
+        return true; // Keep this exclusion
+      });
     }
 
     try {
